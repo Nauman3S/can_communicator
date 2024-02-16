@@ -164,9 +164,9 @@ class CANApplication:
 
                 # Schedule message sending tasks
                 tasks = [
-                    self.send_message_with_interval(0x102, bytearray([0, 0, 15, 255, 15, 255, 48, 0, 79, 255, 0, 0, 7, 255, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 7, 255, 7, 255, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), 0.01),
-                    self.send_message_with_interval(0x262, bytearray([0, 1 , 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), 0.1),
-                    self.send_message_with_interval(0x300, [0x55] * 8, 1)
+                    self.send_message_with_interval(0x102, bytearray([0, 0, 15, 255, 15, 255, 48, 0, 79, 255, 0, 0, 7, 255, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 7, 255, 7, 255, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), self.message_intervals[0x102]),
+                    self.send_message_with_interval(0x262, bytearray([0, 1 , 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]), self.message_intervals[0x262]),
+                    self.send_message_with_interval(0x300, [0x55] * 8, self.message_intervals[0x300])
                 ]
                 await asyncio.gather(*tasks)
                 # logging.info(f"sendefreigabe={self.display_send}")#thread-safe print
