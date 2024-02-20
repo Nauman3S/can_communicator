@@ -19,6 +19,7 @@ calculator = Calculator(Crc8.SAEJ1850)
 class SerialThread:
     def __init__(self, app, port="/dev/ttyS0", baudrate=115200):
         self.app = app
+        logging.info(f"Serial port: {port}, Baudrate: {baudrate}")
         self.serial_port = serial.Serial(port, baudrate=baudrate)
         self.running = False
 
@@ -28,6 +29,7 @@ class SerialThread:
         self.thread.start()
 
     def run(self):
+        logging.info("Serial thread starting...")
         buffer = b''  # Initialize an empty byte buffer
         while self.running:
             data = self.serial_port.read(self.serial_port.in_waiting or 1)
@@ -69,10 +71,12 @@ class SerialThread:
         self.running = False
         self.thread.join()
         self.serial_port.close()
+        logging.info("Serial thread stopped.")
 
 class CANApplication:
     def __init__(self):
         self.protocol = None  # This will be set in start_serial_communication
+        logging.info("CAN bus initialization...")
 
         self.MAILBOX_MESSAGE_ID = 0x28A
         self.loop = asyncio.get_event_loop()
@@ -126,9 +130,11 @@ class CANApplication:
         logging.info(f"serial_data={data}")
         if data.startswith(b"Start"):
             self.sendefreigabe = True
+            logging.info(f"Application state changed: sendefreigabe={self.sendefreigabe}")
             self.display_connected = True
         elif data.startswith(b"Stop"):
             self.sendefreigabe = False
+            logging.info(f"Application state changed: sendefreigabe={self.sendefreigabe}")
             self.display_connected = False
         elif data[0:1] ==b"H":
             self.speed =int(data[1:])
@@ -136,8 +142,8 @@ class CANApplication:
 
     async def receive_can_messages(self):
         
+        logging.info("CAN message receiver task starting...")
 
-        logging.info("Starting to receive CAN messages")
         while True:
             message = await self.loop.run_in_executor(None, self.can_bus.recv)
             if message:
@@ -164,12 +170,13 @@ class CANApplication:
                     self.display_send(f"t3.txt=\"{dfov_received_value}\"")
                     self.display_send(f"t4.txt=\"{dms_state_received_value}\"")
         except:
+            logging.error("Exception in CAN message processing task", exc_info=True)
             d=0
     async def send_message_with_interval(self, message_id, data, interval):
-        while True:
-            msg = can.Message(arbitration_id=message_id, data=data, is_extended_id=False, is_fd=True, bitrate_switch=True)
-            self.can_bus.send(msg)
-            await asyncio.sleep(interval)
+        # while True:
+        msg = can.Message(arbitration_id=message_id, data=data, is_extended_id=False, is_fd=True, bitrate_switch=True)
+        self.can_bus.send(msg)
+        await asyncio.sleep(interval)
             
     async def send_can_messages(self):
         logging.info("Preparing to send CAN messages")
@@ -213,8 +220,10 @@ class CANApplication:
         self.loop.run_forever()
 async def close_can_bus(can_bus):
     can_bus.shutdown()
+    logging.info("Can_bus shutdown initiated.")
+
 def main():
-    
+    logging.info("Application starting...")
     app = CANApplication()
     app.start_serial_communication()
     app.run()
@@ -233,5 +242,6 @@ def main():
 if __name__ == "__main__":
     
     main()
+    logging.info("Application shutdown initiated.")
     
 
