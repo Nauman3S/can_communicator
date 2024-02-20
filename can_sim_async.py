@@ -19,7 +19,7 @@ calculator = Calculator(Crc8.SAEJ1850)
 class SerialThread:
     def __init__(self, app, port="/dev/ttyS0", baudrate=115200):
         self.app = app
-        logging.info(f"Serial port: {port}, Baudrate: {baudrate}")
+        logging.info("Serial port: {}, Baudrate: {}".format(port, baudrate))
         self.serial_port = serial.Serial(port, baudrate=baudrate)
         self.running = False
 
@@ -47,15 +47,15 @@ class SerialThread:
                             speed = int(speed_str)  # Convert to integer
                             
                             if 0 <= speed <= 511:  # Validate the speed value
-                                logging.info(f"Valid speed value received: {speed}")
+                                logging.info("Valid speed value received: {}".format(speed))
                                 # self.app.process_speed(speed)
                                 self.app.process_serial_data(buffer)
                             else:
-                                logging.info(f"Invalid speed value: {speed}")
+                                logging.info("Invalid speed value: {}".format(speed))
                             
                             buffer = b''  # Reset the buffer after processing
                         elif(b"Start" in buffer or b"Stop" in buffer) :
-                            logging.info(f"serial_data_buffer={buffer}")
+                            logging.info("serial_data_buffer={}".format(buffer))
                             self.app.process_serial_data(buffer)
                             buffer = b''  # Reset the buffer after processing
                         
@@ -127,14 +127,14 @@ class CANApplication:
 
 
     def process_serial_data(self, data):
-        logging.info(f"serial_data={data}")
+        logging.info("serial_data={}".format(data))
         if data.startswith(b"Start"):
             self.sendefreigabe = True
-            logging.info(f"Application state changed: sendefreigabe={self.sendefreigabe}")
+            logging.info("Application state changed: sendefreigabe={}".format(self.sendefreigabe))
             self.display_connected = True
         elif data.startswith(b"Stop"):
             self.sendefreigabe = False
-            logging.info(f"Application state changed: sendefreigabe={self.sendefreigabe}")
+            logging.info("Application state changed: sendefreigabe={}".format(self.sendefreigabe))
             self.display_connected = False
         elif data[0:1] ==b"H":
             self.speed =int(data[1:])
