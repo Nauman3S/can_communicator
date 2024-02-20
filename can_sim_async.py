@@ -38,8 +38,21 @@ class SerialThread:
                     # Here you might want to check if buffer contains a complete message
                     # For now, we'll just log and clear the buffer
                     if buffer.strip():  # Only process non-empty buffers
-                        
-                        if (b"Start" in buffer or b"Stop" in buffer or re.search(b'H\d{1,4}', buffer)):
+                        #try to extract speed
+                        match = re.search(b'H(\d{1,4})', buffer)
+                        if (match):
+                            speed_str = match.group(1).decode('utf-8')  # Extract and decode the speed value
+                            speed = int(speed_str)  # Convert to integer
+                            
+                            if 0 <= speed <= 511:  # Validate the speed value
+                                logging.info(f"Valid speed value received: {speed}")
+                                # self.app.process_speed(speed)
+                                self.app.process_serial_data(buffer)
+                            else:
+                                logging.info(f"Invalid speed value: {speed}")
+                            
+                            buffer = b''  # Reset the buffer after processing
+                        elif(b"Start" in buffer or b"Stop" in buffer) :
                             logging.info(f"serial_data_buffer={buffer}")
                             self.app.process_serial_data(buffer)
                             buffer = b''  # Reset the buffer after processing
@@ -90,6 +103,24 @@ class CANApplication:
         command = bytes(stringCommand, encoding="raw_unicode_escape") + b"\xff\xff\xff"
         if self.display_connected:
             self.serial_thread.send_data(command)
+    
+    def process_speed(self, speed, data):
+        # Ensure 'data' bytearray is long enough and 'speed' is within a 13-bit range
+        if len(data) < 2:
+            raise ValueError("Data bytearray must be at least 2 bytes long.")
+        if not (0 <= speed <= 8191):  # 13-bit maximum
+            raise ValueError("Speed value must be between 0 and 8191.")
+        
+        # Calculate bytes from speed: 13 bits spread across byte 0 (bits 0-4) and byte 1 (bits 0-7, with bit 0 being the LSB of speed)
+        byte1 = speed & 0xFF  # Lower 8 bits of speed
+        byte0 = (speed >> 8) & 0x1F  # Upper 5 bits of speed, shifted into position
+        
+        # Update 'data' bytearray
+        data[0] = (data[0] & 0xE0) | byte0  # Preserve upper 3 bits of byte 0, update lower 5 bits
+        data[1] = byte1  # Update byte 1 with lower 8 bits of speed
+
+        return data
+
 
     def process_serial_data(self, data):
         logging.info(f"serial_data={data}")
@@ -100,7 +131,8 @@ class CANApplication:
             self.sendefreigabe = False
             self.display_connected = False
         elif data[0:1] ==b"H":
-            speed =int(data[1:])
+            self.speed =int(data[1:])
+            
 
     async def receive_can_messages(self):
         
@@ -156,6 +188,8 @@ class CANApplication:
 
         while True:
             if self.sendefreigabe:
+
+                data1=self.process_speed(self.speed, data1)
                 # Update counter and CRC in msg1 data before sending
                 self.data1_counter = (self.data1_counter + 1) % 16
                 data1[54] = self.data1_counter
