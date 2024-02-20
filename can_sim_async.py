@@ -54,7 +54,7 @@ class SerialThread:
                                 logging.info("Invalid speed value: {}".format(speed))
                             
                             buffer = b''  # Reset the buffer after processing
-                        elif(b"Start" in buffer or b"Stop" in buffer) :
+                        elif(b"Sta" in buffer or b"Sto" in buffer) :
                             logging.info("serial_data_buffer={}".format(buffer))
                             self.app.process_serial_data(buffer)
                             buffer = b''  # Reset the buffer after processing
@@ -92,10 +92,15 @@ class CANApplication:
         self.speed = 0
         self.data_display = "0"
         self.protocol = None
+
+        self.MESSAGE_ID_1 = 0x102
+        self.MESSAGE_ID_2 = 0x262
+        self.MESSAGE_ID_3 = 0x300
+
         self.message_intervals = {
-            0x102: 0.01,  # Message ID 1: Send every 10 ms
-            0x262: 0.1,   # Message ID 2: Send every 100 ms
-            0x300: 1      # Message ID 3: Send every 1 second
+            self.MESSAGE_ID_1: 0.01,  # Message ID 1: Send every 10 ms
+            self.MESSAGE_ID_2: 0.1,   # Message ID 2: Send every 100 ms
+            self.MESSAGE_ID_3: 1      # Message ID 3: Send every 1 second
         }
         self.loop = asyncio.get_event_loop()
 
@@ -128,11 +133,12 @@ class CANApplication:
 
     def process_serial_data(self, data):
         logging.info("serial_data={}".format(data))
-        if data.startswith(b"Start"):
+        data_local=data.decode('utf-8')
+        if "Sta" in data_local:
             self.sendefreigabe = True
             logging.info("Application state changed: sendefreigabe={}".format(self.sendefreigabe))
             self.display_connected = True
-        elif data.startswith(b"Stop"):
+        elif "Sto" in data_local:
             self.sendefreigabe = False
             logging.info("Application state changed: sendefreigabe={}".format(self.sendefreigabe))
             self.display_connected = False
@@ -171,48 +177,47 @@ class CANApplication:
                     self.display_send(f"t4.txt=\"{dms_state_received_value}\"")
         except:
             logging.error("Exception in CAN message processing task", exc_info=True)
-            d=0
-    async def send_message_with_interval(self, message_id, data, interval):
-        # while True:
-        msg = can.Message(arbitration_id=message_id, data=data, is_extended_id=False, is_fd=True, bitrate_switch=True)
-        self.can_bus.send(msg)
-        await asyncio.sleep(interval)
             
-    async def send_can_messages(self):
-        logging.info("Preparing to send CAN messages")
-
-        MESSAGE_ID_1 = 0x102
-        MESSAGE_ID_2 = 0x262
-        MESSAGE_ID_3 = 0x300
+    async def send_message_with_interval(self, message_id, interval):
         data1 = bytearray(64)
         data1 = bytearray([0, 0, 15, 255, 15, 255, 48, 0, 79, 255, 0, 0, 7, 255, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 7, 255, 7, 255, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         data2 = bytearray(32)
         data2 = bytearray([0, 1 , 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         data3 = [0x55] * 8
-        msg1 = can.Message(arbitration_id=MESSAGE_ID_1, data=data1, is_extended_id=False, is_fd=True, bitrate_switch=True)
-        msg2 = can.Message(arbitration_id=MESSAGE_ID_2, data=data2, is_extended_id=False, is_fd=True, bitrate_switch=True)
-        msg3 = can.Message(arbitration_id=MESSAGE_ID_3, data=data3, is_extended_id=False, is_fd=True, bitrate_switch=True)
-
         while True:
             if self.sendefreigabe:
-
-                data1=self.process_speed(self.speed, data1)
-                # Update counter and CRC in msg1 data before sending
-                self.data1_counter = (self.data1_counter + 1) % 16
-                data1[54] = self.data1_counter
-                self.data1_checksum = calculator.checksum(data1[:55]) # Assume the last byte is for checksum
-                data1[55] = self.data1_checksum
-
-                # Schedule message sending tasks
-                tasks = [
-                    self.send_message_with_interval(MESSAGE_ID_1, data1, self.message_intervals[MESSAGE_ID_1]),
-                    self.send_message_with_interval(MESSAGE_ID_2, data2, self.message_intervals[MESSAGE_ID_2]),
-                    self.send_message_with_interval(MESSAGE_ID_3, data3, self.message_intervals[MESSAGE_ID_3])
-                ]
-                await asyncio.gather(*tasks)
+                if message_id==self.MESSAGE_ID_1:
+                    data1=self.process_speed(self.speed, data1)
+                    # Update counter and CRC in msg1 data before sending
+                    self.data1_counter = (self.data1_counter + 1) % 16
+                    data1[54] = self.data1_counter
+                    self.data1_checksum = calculator.checksum(data1[:55]) # Assume the last byte is for checksum
+                    data1[55] = self.data1_checksum
+                    msg = can.Message(arbitration_id=message_id, data=data1, is_extended_id=False, is_fd=True, bitrate_switch=True)
+                elif message_id==self.MESSAGE_ID_2:
+                    msg = can.Message(arbitration_id=message_id, data=data2, is_extended_id=False, is_fd=True, bitrate_switch=True)
+                elif message_id==self.MESSAGE_ID_3:
+                    msg = can.Message(arbitration_id=message_id, data=data3, is_extended_id=False, is_fd=True, bitrate_switch=True)
+                
+                self.can_bus.send(msg)
+                await asyncio.sleep(interval)
             else:
-                await asyncio.sleep(1)  # Adjust sleep time as needed
-                # logging.info(f"sendefreigabe={self.display_send}")#thread-safe print
+                await asyncio.sleep(0.5)  # Adjust sleep time as needed
+                
+    async def send_can_messages(self):
+        logging.info("Preparing to send CAN messages")
+
+        if self.sendefreigabe:
+            # Schedule message sending tasks
+            tasks = [
+                self.send_message_with_interval(self.MESSAGE_ID_1, self.message_intervals[self.MESSAGE_ID_1]),
+                self.send_message_with_interval(self.MESSAGE_ID_2, self.message_intervals[self.MESSAGE_ID_2]),
+                self.send_message_with_interval(self.MESSAGE_ID_3, self.message_intervals[self.MESSAGE_ID_3])
+            ]
+            await asyncio.gather(*tasks)
+        else:
+            await asyncio.sleep(0.5)  # Adjust sleep time as needed
+    
     def run(self):
         self.loop.create_task(self.send_can_messages())
         self.loop.create_task(self.receive_can_messages())
