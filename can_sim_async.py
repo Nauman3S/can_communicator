@@ -133,12 +133,11 @@ class CANApplication:
 
     def process_serial_data(self, data):
         logging.info("serial_data={}".format(data))
-        data_local=data.decode('utf-8')
-        if "Sta" in data_local:
+        if data.startswith(b"Sta"):
             self.sendefreigabe = True
             logging.info("Application state changed: sendefreigabe={}".format(self.sendefreigabe))
             self.display_connected = True
-        elif "Sto" in data_local:
+        elif data.startswith(b"Sto"):
             self.sendefreigabe = False
             logging.info("Application state changed: sendefreigabe={}".format(self.sendefreigabe))
             self.display_connected = False
@@ -177,7 +176,7 @@ class CANApplication:
                     self.display_send(f"t4.txt=\"{dms_state_received_value}\"")
         except:
             logging.error("Exception in CAN message processing task", exc_info=True)
-            
+
     async def send_message_with_interval(self, message_id, interval):
         data1 = bytearray(64)
         data1 = bytearray([0, 0, 15, 255, 15, 255, 48, 0, 79, 255, 0, 0, 7, 255, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 7, 255, 7, 255, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
