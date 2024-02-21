@@ -76,6 +76,7 @@ class SerialThread:
 class CANApplication:
     def __init__(self):
         self.sendefreigabe_event = asyncio.Event()
+        self.sendefreigabe_event.clear()  # init false
 
         self.protocol = None  # This will be set in start_serial_communication
         logging.info("CAN bus initialization...")
@@ -142,7 +143,7 @@ class CANApplication:
             self.display_connected = True
         elif data.startswith(b"Sto"):
             
-            self.sendefreigabe_event.clear()  # Allow sending
+            self.sendefreigabe_event.clear()  # stop sending
             logging.info("Application state changed: sendefreigabe_event=False")
             self.display_connected = False
         elif data[0:1] ==b"H":
