@@ -39,7 +39,9 @@ class SerialThread:
                 if len(data) < self.serial_port.in_waiting or not self.serial_port.in_waiting:
                     # Here you might want to check if buffer contains a complete message
                     # For now, we'll just log and clear the buffer
+                    
                     if buffer.strip():  # Only process non-empty buffers
+                        buffer = re.sub(rb'[^\x20-\x7E]+', b'', buffer) #remove non ascii chars
                         #try to extract speed
                         match = re.search(b'H(\d{1,4})', buffer)
                         if (match):
