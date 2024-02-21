@@ -117,19 +117,22 @@ class CANApplication:
             self.serial_thread.send_data(command)
     
     def process_speed(self, speed, data):
-        # Ensure 'data' bytearray is long enough and 'speed' is within a 13-bit range
+        # Ensure 'data' bytearray is long enough and 'speed' is within the specified range
         if len(data) < 2:
             raise ValueError("Data bytearray must be at least 2 bytes long.")
-        if not (0 <= speed <= 8191):  # 13-bit maximum
-            raise ValueError("Speed value must be between 0 and 8191.")
-        
-        # Calculate bytes from speed: 13 bits spread across byte 0 (bits 0-4) and byte 1 (bits 0-7, with bit 0 being the LSB of speed)
-        byte1 = speed & 0xFF  # Lower 8 bits of speed
-        byte0 = (speed >> 8) & 0x1F  # Upper 5 bits of speed, shifted into position
-        
+        if not (0 <= speed <= 511):  # Speed value must be between 0 and 511 for 13-bit encoding
+            raise ValueError("Speed value must be between 0 and 511.")
+
+        # Encode the 13-bit speed into bytes 0 and 1
+        # Byte 0 will have bits 0-4 (lower 5 bits of speed)
+        # Byte 1 will start with the next bit of speed as its bit 0, followed by the next 7 bits
+        # This effectively shifts the speed one bit to the right, starting from bit 0 of Byte 1
+        byte0 = (speed >> 8) & 0x1F  # Extract bits 8-12 (5 bits) of speed for Byte 0
+        byte1 = speed & 0xFF  # Extract bits 0-7 of speed for Byte 1
+
         # Update 'data' bytearray
         data[0] = (data[0] & 0xE0) | byte0  # Preserve upper 3 bits of byte 0, update lower 5 bits
-        data[1] = byte1  # Update byte 1 with lower 8 bits of speed
+        data[1] = byte1  # Byte 1 contains the lower 8 bits of speed
 
         return data
 
