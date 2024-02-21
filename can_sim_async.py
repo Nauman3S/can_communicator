@@ -75,13 +75,15 @@ class SerialThread:
 
 class CANApplication:
     def __init__(self):
+        self.sendefreigabe_event = asyncio.Event()
+
         self.protocol = None  # This will be set in start_serial_communication
         logging.info("CAN bus initialization...")
 
         self.MAILBOX_MESSAGE_ID = 0x28A
         self.loop = asyncio.get_event_loop()
         self.calculator = Calculator(Crc8.SAEJ1850)
-        self.sendefreigabe = False
+        
         self.display_connected = False
         self.can_bus = can.interface.Bus(channel='can0', receive_own_messages=False, local_loopback=True, fd=True, can_filters=None, bustype='socketcan')
         self.can_bus.set_filters([{"can_id": self.MAILBOX_MESSAGE_ID, "can_mask": 0x7FF, "extended": False}])  # Setting CAN filters as per old code
@@ -134,12 +136,14 @@ class CANApplication:
     def process_serial_data(self, data):
         logging.info("serial_data={}".format(data))
         if data.startswith(b"Sta"):
-            self.sendefreigabe = True
-            logging.info("Application state changed: sendefreigabe={}".format(self.sendefreigabe))
+            
+            self.sendefreigabe_event.set()  # Allow sending
+            logging.info("Application state changed: sendefreigabe_event=True")
             self.display_connected = True
         elif data.startswith(b"Sto"):
-            self.sendefreigabe = False
-            logging.info("Application state changed: sendefreigabe={}".format(self.sendefreigabe))
+            
+            self.sendefreigabe_event.clear()  # Allow sending
+            logging.info("Application state changed: sendefreigabe_event=False")
             self.display_connected = False
         elif data[0:1] ==b"H":
             self.speed =int(data[1:])
@@ -184,24 +188,23 @@ class CANApplication:
         data2 = bytearray([0, 1 , 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         data3 = [0x55] * 8
         while True:
-            if self.sendefreigabe:
-                if message_id==self.MESSAGE_ID_1:
-                    data1=self.process_speed(self.speed, data1)
-                    # Update counter and CRC in msg1 data before sending
-                    self.data1_counter = (self.data1_counter + 1) % 16
-                    data1[54] = self.data1_counter
-                    self.data1_checksum = calculator.checksum(data1[:55]) # Assume the last byte is for checksum
-                    data1[55] = self.data1_checksum
-                    msg = can.Message(arbitration_id=message_id, data=data1, is_extended_id=False, is_fd=True, bitrate_switch=True)
-                elif message_id==self.MESSAGE_ID_2:
-                    msg = can.Message(arbitration_id=message_id, data=data2, is_extended_id=False, is_fd=True, bitrate_switch=True)
-                elif message_id==self.MESSAGE_ID_3:
-                    msg = can.Message(arbitration_id=message_id, data=data3, is_extended_id=False, is_fd=True, bitrate_switch=True)
-                
-                self.can_bus.send(msg)
-                await asyncio.sleep(interval)
-            else:
-                await asyncio.sleep(0.5)  # Adjust sleep time as needed
+            await self.sendefreigabe_event.wait()
+            if message_id==self.MESSAGE_ID_1:
+                data1=self.process_speed(self.speed, data1)
+                # Update counter and CRC in msg1 data before sending
+                self.data1_counter = (self.data1_counter + 1) % 16
+                data1[54] = self.data1_counter
+                self.data1_checksum = calculator.checksum(data1[:55]) # Assume the last byte is for checksum
+                data1[55] = self.data1_checksum
+                msg = can.Message(arbitration_id=message_id, data=data1, is_extended_id=False, is_fd=True, bitrate_switch=True)
+            elif message_id==self.MESSAGE_ID_2:
+                msg = can.Message(arbitration_id=message_id, data=data2, is_extended_id=False, is_fd=True, bitrate_switch=True)
+            elif message_id==self.MESSAGE_ID_3:
+                msg = can.Message(arbitration_id=message_id, data=data3, is_extended_id=False, is_fd=True, bitrate_switch=True)
+            
+            self.can_bus.send(msg)
+            await asyncio.sleep(interval)
+        
                 
     async def send_can_messages(self):
         logging.info("Preparing to send CAN messages")
