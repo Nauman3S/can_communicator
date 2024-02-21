@@ -206,16 +206,15 @@ class CANApplication:
     async def send_can_messages(self):
         logging.info("Preparing to send CAN messages")
 
-        if self.sendefreigabe:
-            # Schedule message sending tasks
-            tasks = [
-                self.send_message_with_interval(self.MESSAGE_ID_1, self.message_intervals[self.MESSAGE_ID_1]),
-                self.send_message_with_interval(self.MESSAGE_ID_2, self.message_intervals[self.MESSAGE_ID_2]),
-                self.send_message_with_interval(self.MESSAGE_ID_3, self.message_intervals[self.MESSAGE_ID_3])
-            ]
-            await asyncio.gather(*tasks)
-        else:
-            await asyncio.sleep(0.5)  # Adjust sleep time as needed
+        
+        # Schedule message sending tasks
+        tasks = [
+            self.send_message_with_interval(self.MESSAGE_ID_1, self.message_intervals[self.MESSAGE_ID_1]),
+            self.send_message_with_interval(self.MESSAGE_ID_2, self.message_intervals[self.MESSAGE_ID_2]),
+            self.send_message_with_interval(self.MESSAGE_ID_3, self.message_intervals[self.MESSAGE_ID_3])
+        ]
+        await asyncio.gather(*tasks)
+        
     
     def run(self):
         self.loop.create_task(self.send_can_messages())
